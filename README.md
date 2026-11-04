@@ -25,14 +25,13 @@ Agrega esto a tu archivo de configuración de MCP (ej. `mcp_config.json` o `clau
       "args": [
         "-y",
         "github:rayhuanca1234/flow-veo3-mcp"
-      ],
-      "env": {
-        "account": "tu_correo@gmail.com"
-      }
+      ]
     }
   }
 }
 ```
+
+> **Nota**: Abre tu Google Chrome normalmente en la cuenta que desees y asegúrate de tener la extensión **AI Auto-Prompt** activa. El servidor MCP se conectará directamente a tu sesión activa sin requerir configurar correos ni variables de entorno.
 
 ### Opción B: Ejecución local con Node.js
 
