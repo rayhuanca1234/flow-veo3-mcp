@@ -1,0 +1,41 @@
+{
+  "name": "flow-veo3-mcp",
+  "version": "1.1.0",
+  "description": "MCP Server + Agent Skill + WebSocket Bridge for Google Flow, Veo 3, Gemini & Google Vids with Ingredients Mode & Chrome Profile Auto-Selection",
+  "type": "module",
+  "main": "./mcp-stdio.js",
+  "bin": {
+    "flow-veo3-mcp": "./mcp-stdio.js",
+    "flow-veo3-install": "./install.js",
+    "flow-veo3-cli": "./cli.js"
+  },
+  "files": [
+    "install.js",
+    "server.js",
+    "mcp-stdio.js",
+    "cli.js",
+    "chromeProfileResolver.js",
+    "masterPromptLocal.js",
+    "skills/",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node server.js",
+    "mcp": "node mcp-stdio.js",
+    "cli": "node cli.js",
+    "install-mcp": "node install.js"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "flow",
+    "veo3",
+    "gemini",
+    "google-vids",
+    "antigravity",
+    "skill",
+    "video-generator",
+    "image-generator"
+  ],
+  "license": "MIT"
+}
