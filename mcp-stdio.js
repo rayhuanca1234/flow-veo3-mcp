@@ -113,6 +113,32 @@ export const MCP_TOOLS = [
         }
     },
     {
+        name: 'flow_generate_music',
+        description: 'Genera música de fondo o banda sonora instrumental en Google Vids (Lyria 3), Google Gemini (Modo Música) o Flow Music. Detecta inteligentemente si la app web ya está abierta en Chrome para inyectar directamente sin recargar ni perder contexto.',
+        inputSchema: {
+            type: 'object',
+            required: ['prompt'],
+            properties: {
+                prompt: { type: 'string', description: 'Descripción o estilo musical (ej. "lo-fi cinemático suave con piano melancólico y bajo cálido")' },
+                engine: { type: 'string', enum: ['lyria', 'gemini', 'flow_music'], default: 'lyria', description: 'Motor de música: lyria (Google Vids Lyria 3), gemini (Google Gemini Música), flow_music (Flow Music web)' },
+                duration: { type: 'string', enum: ['15s', '30s', '60s', 'full'], default: 'full', description: 'Duración de la pista musical' },
+                style: { type: 'string', description: 'Estilo musical opcional (ej. "orquestal épico", "synthwave 80s")' },
+                mood: { type: 'string', description: 'Atmósfera o estado de ánimo (ej. "melancólico", "suspenso", "enérgico")' }
+            }
+        }
+    },
+    {
+        name: 'flow_launch_app',
+        description: 'Activa o abre una de las aplicaciones web en Google Chrome (flow, gemini, vids, flow_music). Si la app ya está abierta en una pestaña, la enfoca directamente sin recargar.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                app: { type: 'string', enum: ['flow', 'gemini', 'vids', 'flow_music'], default: 'flow', description: 'App web a enfocar o abrir' },
+                activate: { type: 'boolean', default: true }
+            }
+        }
+    },
+    {
         name: 'flow_generate_image',
         description: 'Genera una imagen ultra realista o estilizada con Google Flow (Imagen 3), Google Gemini o Google Vids, controlando la relación de aspecto (9:16, 16:9, 1:1, 4:3, 3:4) y adjuntando ingredientes/personajes (@Tag).',
         inputSchema: {
@@ -308,6 +334,10 @@ export async function invokeMcpTool(name, args = {}) {
             return await callBridge('/list-models', 'GET');
         case 'flow_add_ingredient':
             return await callBridge('/add-ingredient', 'POST', args);
+        case 'flow_generate_music':
+            return await callBridge('/generate-music', 'POST', args);
+        case 'flow_launch_app':
+            return await callBridge('/launch-app', 'POST', args);
         case 'flow_generate_image':
             return await callBridge('/generate-image', 'POST', args);
         case 'flow_generate_video':

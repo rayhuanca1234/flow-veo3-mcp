@@ -1,21 +1,43 @@
 # flow-veo3-mcp 🚀
 
-Servidor **MCP (Model Context Protocol)** estándar sobre `stdio` + **Agent Skill** + **Puente WebSocket Local** (`127.0.0.1:3847`) para controlar de forma autónoma la generación de **Imágenes** y **Vídeos** en:
-- 🌊 **Google Flow (Veo 3 & Imagen 3)**
-- ✨ **Google Gemini (Omni Video / Veo & Imagen 3)**
-- 🎞️ **Google Vids (Veo 3)**
-
-Incluye **Modo Ingredientes (@Tag)** para consistencia de personajes, control total de **relaciones de aspecto (9:16, 16:9, 1:1, etc.)**, duraciones (4s/8s), calidades (360p/720p) y **detección automática del perfil/cuenta de Google Chrome** en Windows para saltar directamente la pantalla de "¿Qué perfil de Chrome quieres usar?".
+Servidor **MCP (Model Context Protocol)** estándar sobre `stdio` + **Agent Skill** + **Puente WebSocket Local** (`127.0.0.1:3847`) para controlar de forma autónoma, individual y completa la creación multimedia con Inteligencia Artificial en:
+- 🌊 **Google Flow (Imagen 3 & Veo 3)**
+- ✨ **Google Gemini (Imagen 3, Omni Video / Veo & Modo Música)**
+- 🎞️ **Google Vids (Veo 3 & Música de Fondo con Lyria 3)**
+- 🎧 **Flow Music (flowmusic.app)**
 
 ---
 
-## ⚡ Instalación y Uso Rápido para Cualquier Persona
+## 🎯 Capacidades Principales (Nivel Senior)
 
-Cualquier persona puede agregar este servidor MCP directamente en su cliente favorito (**Antigravity, Claude Desktop, Cursor, Continue**, etc.).
+1. **Detección Inteligente de Pestañas (Zero-Reload / Sin Redirección Innecesaria)**:
+   - Si la app web requerida (**Google Flow**, **Google Gemini**, **Google Vids** o **Flow Music**) ya está abierta en tu Chrome, el MCP **NO recarga ni navega de nuevo**. Se engancha de inmediato a la pestaña activa e inyecta la generación al instante.
+   - Si la app web no está abierta, el orquestador la abre automáticamente en tu perfil de Chrome y procede a la inyección.
 
-### Opción A: Ejecución directa con NPX desde GitHub (Sin descargar nada)
+2. **Generación Individual de Imágenes (`flow_generate_image`)**:
+   - Motores: `flow` (Google Flow Imagen 3/4) o `gemini` (Google Gemini Imagen 3).
+   - Relaciones de aspecto configurables: `1:1` (cuadrado), `9:16` (vertical reels/tiktok), `16:9` (horizontal youtube), `4:3`, `3:4`.
+   - Soporte de ingredientes `@Tag` para mantener consistencia de personajes y locaciones.
 
-Agrega esto a tu archivo de configuración de MCP (ej. `mcp_config.json` o `claude_desktop_config.json`):
+3. **Generación Individual de Vídeos (`flow_generate_video`)**:
+   - Motores: `flow` (Veo 3), `gemini` (Omni Video / Veo) o `vids` (Google Vids).
+   - Modos: `ingredients` (directo con `@personaje` sin requerir imagen base) o `frames` (animación de imagen previa).
+   - Controles de cámara, duraciones (`4s`, `8s`) y resoluciones (`360p`, `720p`).
+
+4. **Generación de Música de Fondo (`flow_generate_music`)**:
+   - Motores: `lyria` (Google Vids con **Lyria 3**), `gemini` (Google Gemini en **Modo Música**) o `flow_music` (Flow Music web).
+   - Estilos musicales, atmósferas/mood y duraciones (`15s`, `30s`, `60s`, `full`).
+
+5. **Orquestador Autónomo Completo (`flow_run_full_pipeline`)**:
+   - Generación de guion JSON bajo el 100% de las reglas del Master Prompt oficial.
+   - Regla estricta de reintentos: Máximo 3 intentos por escena (`1 original + 2 reintentos`) en la misma sesión activa, sin bucles infinitos.
+   - Ensamblado y renderizado final nativo en Facereels Studio.
+
+---
+
+## ⚡ Instalación y Uso Rápido (Zero-Config)
+
+Agrega este bloque a tu archivo de configuración de MCP (ej. `mcp_config.json`, `claude_desktop_config.json` o la configuración de MCP de Antigravity):
 
 ```json
 {
@@ -31,106 +53,20 @@ Agrega esto a tu archivo de configuración de MCP (ej. `mcp_config.json` o `clau
 }
 ```
 
-> **Nota**: Abre tu Google Chrome normalmente en la cuenta que desees y asegúrate de tener la extensión **AI Auto-Prompt** activa. El servidor MCP se conectará directamente a tu sesión activa sin requerir configurar correos ni variables de entorno.
-
-### Opción B: Ejecución local con Node.js
-
-1. Clona el repositorio:
-   ```bash
-   git clone https://github.com/rayhuanca1234/flow-veo3-mcp.git
-   cd flow-veo3-mcp
-   ```
-2. Agrega la ruta a tu archivo de configuración MCP:
-   ```json
-   {
-     "mcpServers": {
-       "flow-veo3": {
-         "command": "node",
-         "args": [
-           "C:/ruta/a/flow-veo3-mcp/mcp-stdio.js"
-         ],
-         "env": {
-           "account": "tu_correo@gmail.com"
-         }
-       }
-     }
-   }
-   ```
-
----
-
-## 👤 Selección Automática de Cuenta en Google Chrome (`account`)
-
-Si tienes múltiples perfiles en Google Chrome, Chrome suele abrir el modal **"¿Qué perfil de Chrome quieres usar?"**.
-
-Con este MCP, al configurar la variable de entorno `"account"`:
-- Puede ser tu correo: `"cutecathardsennin@gmail.com"`, `"hardynhuanca@gmail.com"`
-- O tu nombre de perfil en Chrome: `"cutecat2047"`, `"black"`, `"Big dady"`
-- O el directorio interno: `"Profile 7"`, `"Profile 13"`, `"Default"`
-
-El servidor MCP inspecciona automáticamente `%LOCALAPPDATA%\Google\Chrome\User Data\Local State`, localiza la carpeta del perfil y arranca Chrome con `--profile-directory="Profile X"`, **abriendo tu cuenta de Google específica directamente sin interrupciones**.
+> **Consejo**: Abre Google Chrome en tu cuenta habitual y ten activa la extensión **AI Auto-Prompt**. No requieres configurar nada más.
 
 ---
 
 ## 🛠️ Herramientas Expuestas (MCP Tools)
 
-### 1. `flow_generate_image`
-Genera imágenes cinematográficas o fotográficas en Flow, Gemini o Vids:
-* **`prompt`** *(string, requerido)*: Prompt descriptivo de la imagen.
-* **`engine`** *(enum)*: `"flow"` (Imagen 3 en Flow), `"gemini"` (Imagen 3 en Gemini), `"vids"` (Google Vids), `"google_images"`.
-* **`aspectRatio`** *(enum)*: `"9:16"` (TikTok/Reels/Shorts), `"16:9"` (YouTube), `"1:1"` (Instagram Feed), `"4:3"`, `"3:4"`.
-* **`ingredients`** *(array)*: Lista de ingredientes a asociar (`[{ "tag": "@carlos", "image": "ruta/o/base64" }]` o tags ya registrados).
-* **`style`** *(string)*: Estilo visual (*"cinemático 35mm", "anime 3d", "plastilina"*).
-
-### 2. `flow_generate_video`
-Genera vídeos en Google Flow (Veo 3), Google Gemini (Omni Video) o Google Vids (Veo 3):
-* **`prompt`** *(string, requerido)*: Instrucciones de movimiento, cámara, iluminación y atmósfera.
-* **`engine`** *(enum)*: `"flow"`, `"gemini_omni"`, `"vids"`.
-* **`videoMode`** *(enum)*:
-  * `"ingredients"`: **Generación directa a partir de texto e ingredientes `@Tag`** sin imagen base previa.
-  * `"frames"`: **Image-to-Video**, anima una imagen previa indicada en `baseImage`.
-* **`modelFamily`** *(en Flow)*:
-  * `"Omni 1.1 Flash"` (Recomendado oficial Google Flow).
-  * `"Veo 3.1 Fast"` (Generación rápida 720p).
-  * `"Veo 3 Quality"` (Máxima fidelidad cinematográfica).
-* **`aspectRatio`** *(enum)*: `"9:16"`, `"16:9"`, `"1:1"`.
-* **`duration`** *(enum)*: `"4s"`, `"8s"`.
-* **`resolution`** *(enum)*: `"360p"`, `"720p"`.
-* **`outputsCount`** *(enum)*: `"x1"`, `"x2"`, `"x4"`.
-* **`baseImage`** *(string)*: Ruta local en disco, URL o base64 (requerido para modo `"frames"`).
-* **`ingredients`** *(array)*: Personajes u objetos `@Tag` a incorporar.
-
-### 3. `flow_add_ingredient`
-Registra un personaje, locación, objeto o estilo visual:
-* **`tag`** *(string, requerido)*: Etiqueta `@Nombre` (ej. `"@carlos"`, `"@laboratorio"`).
-* **`name`** *(string)*: Nombre descriptivo.
-* **`type`** *(enum)*: `"character"`, `"location"`, `"prop"`, `"style"`.
-* **`image`** *(string)*: Ruta de archivo local en disco, URL HTTP o base64 DataURL *(se convierte automáticamente a memoria para Chrome)*.
-* **`description`** *(string)*: Rasgos físicos y ancla visual.
-
-### 4. `flow_list_models`
-Devuelve el catálogo de todos los modelos, relaciones de aspecto y capacidades de Flow, Gemini y Vids.
-
-### 5. `flow_list_accounts`
-Lista todos los perfiles de Chrome encontrados en el sistema, mostrando cuál coincide con la variable `account`.
-
-### 6. `flow_launch_chrome`
-Abre Google Chrome en la cuenta especificada navegando a Flow (`https://labs.google.com/flow`), Gemini o Vids.
-
-### 7. Orquestación Completa de Guiones y Producción
-* `flow_status`: Verifica conexión en vivo con la extensión Chrome.
-* `flow_get_master_prompt`: Extrae el Master Prompt oficial con Biblia Vocal y plantillas.
-* `flow_autoconfig_project`: Autoconfigura selectores, ratios y opciones.
-* `flow_inject_storyboard`: Inyecta el guion JSON al tablero.
-* `flow_edit_storyboard`: Edita quirúrgicamente escenas, diálogos o personajes.
-* `flow_regenerate_scene_image`: Regenera la imagen de una escena con máx. 3 intentos inteligentes en la misma sesión.
-* `flow_regenerate_scene_video`: Regenera el vídeo de una escena con máx. 3 intentos y suavizado semántico si hay bloqueo de políticas.
-* `flow_run_full_pipeline`: Orquesta todo de principio a fin (Personajes -> Imágenes -> Vídeos -> Render Nativo).
-* `flow_export_assets_to_disk`: Guarda los MP4s, PNGs y el JSON en disco.
-* `flow_cancel_all`: Cancela cualquier generación activa.
-
----
-
-## 📄 Licencia
-
-MIT © Hardyn Huanca / Antigravity Team
+| Herramienta | Descripción |
+|---|---|
+| `flow_generate_image` | Genera una imagen en Google Flow o Gemini con `aspectRatio` (`1:1`, `9:16`, `16:9`, etc.) e ingredientes `@Tag`. Reutiliza la pestaña abierta si ya existe. |
+| `flow_generate_video` | Genera un clip de video en Flow (Veo 3), Gemini (Omni) o Google Vids con modo `ingredients` o `frames`. |
+| `flow_generate_music` | Crea música instrumental de fondo en Google Vids (**Lyria 3**), Google Gemini o Flow Music. |
+| `flow_add_ingredient` | Registra ingredientes o personajes de referencia (`@personaje`, `@locacion`, `@objeto`) para usarlos en prompts. |
+| `flow_list_models` | Consulta el catálogo completo de modelos disponibles en Flow, Gemini, Vids y Lyria. |
+| `flow_launch_app` | Activa o abre la app web deseada (`flow`, `gemini`, `vids`, `flow_music`) en tu Chrome sin recargar. |
+| `flow_run_full_pipeline` | Orquesta la producción completa de un video desde el guion hasta el renderizado final. |
+| `flow_get_master_prompt` | Obtiene la plantilla del Master Prompt oficial para construir guiones de alta retención. |
+| `flow_status` | Verifica el estado de conexión del puente WebSocket y la extensión de Chrome. |

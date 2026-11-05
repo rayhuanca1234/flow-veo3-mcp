@@ -194,31 +194,33 @@ export function resolveFileToDataUrl(val) {
     return trimmed;
 }
 
-export async function ensureExtensionConnected(account = null, waitMs = 12000) {
+export async function ensureExtensionConnected(account = null, waitMs = 12000, targetUrl = 'https://labs.google.com/flow') {
     if (pickActiveClient()) return true;
 
     const acc = account || process.env.account || process.env.ACCOUNT || null;
-    if (acc) {
-        console.log(`[flow-veo3-mcp] Intentando auto-abrir Google Chrome para la cuenta: "${acc}"...`);
-        const extDir = path.resolve(WORKSPACE_ROOT, 'extension para flow-veo3');
-        launchChromeForProfile({
-            account: acc,
-            targetUrl: 'https://labs.google.com/flow',
-            extensionPath: fs.existsSync(extDir) ? extDir : null
-        });
+    const resolvedProfile = findChromeProfile(acc);
+    console.log(`[flow-veo3-mcp] Auto-abriendo Google Chrome para el perfil: "${resolvedProfile?.name || resolvedProfile?.directory || 'Default'}" en ${targetUrl}...`);
+    launchChromeForProfile({
+        account: acc,
+        targetUrl
+    });
 
-        const start = Date.now();
-        while ((Date.now() - start) < waitMs) {
-            await new Promise(r => setTimeout(r, 600));
-            if (pickActiveClient()) return true;
-        }
+    const start = Date.now();
+    while ((Date.now() - start) < waitMs) {
+        await new Promise(r => setTimeout(r, 600));
+        if (pickActiveClient()) return true;
     }
     return Boolean(pickActiveClient());
 }
 
 export async function sendCommandToExtension(command, params = {}, timeoutMs = 900000) {
     if (!pickActiveClient()) {
-        await ensureExtensionConnected(params.account);
+        let targetUrl = 'https://labs.google.com/flow';
+        const engine = String(params.engine || '').toLowerCase();
+        if (engine.includes('gemini')) targetUrl = 'https://gemini.google.com/app';
+        else if (engine.includes('vids') || engine.includes('lyria')) targetUrl = 'https://docs.google.com/videos/';
+        else if (engine.includes('music') || engine.includes('flowmusic')) targetUrl = 'https://www.flowmusic.app/';
+        await ensureExtensionConnected(params.account, 12000, targetUrl);
     }
 
     const client = pickActiveClient();
@@ -640,6 +642,23 @@ const server = http.createServer(async (req, res) => {
             const result = await generateMasterPromptLocally(body, sendCommandToExtension);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(result));
+            return;
+        }
+
+        
+        if (req.method === 'POST' && urlObj.pathname === '/generate-music') {
+            const body = await readJsonBody(req);
+            const result = await sendCommandToExtension('generate_music', body);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, result }));
+            return;
+        }
+
+        if (req.method === 'POST' && urlObj.pathname === '/launch-app') {
+            const body = await readJsonBody(req);
+            const result = await sendCommandToExtension('launch_app', body);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, result }));
             return;
         }
 

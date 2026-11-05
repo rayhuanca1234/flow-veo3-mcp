@@ -1,7 +1,7 @@
 // flow-veo3-mcp/chromeProfileResolver.js
 // Detección automática y apertura de perfiles específicos de Google Chrome en Windows
-// Soporta cuentas por correo (ej. "hardynhuanca@gmail.com", "cutecathardsennin@gmail.com"),
-// por nombre de perfil ("black", "cutecat2047", "Big dady") o por directorio ("Profile 13", "Default").
+// Soporta cuentas por correo (ej. "bigdadysector@gmail.com", "hardynhuanca@gmail.com"),
+// por nombre de perfil ("Big dady", "black", "cutecat2047") o por directorio ("Profile 2", "Default").
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,6 +37,7 @@ export function listChromeProfiles() {
     try {
         const raw = JSON.parse(fs.readFileSync(localStatePath, 'utf8'));
         const infoCache = raw.profile?.info_cache || {};
+        const lastUsed = raw.profile?.last_used || null;
         const results = [];
 
         for (const [directory, info] of Object.entries(infoCache)) {
@@ -46,7 +47,8 @@ export function listChromeProfiles() {
                 name: info.name || directory,
                 email,
                 gaiaName: info.gaia_name || '',
-                isDefault: directory === 'Default'
+                isDefault: directory === 'Default',
+                isLastUsed: directory === lastUsed
             });
         }
         return results;
@@ -58,7 +60,23 @@ export function listChromeProfiles() {
 
 export function findChromeProfile(query = '') {
     const profiles = listChromeProfiles();
-    if (!query) return profiles.find(p => p.isDefault) || profiles[0] || null;
+    const localStatePath = path.join(getChromeUserDataDir(), 'Local State');
+    let lastUsed = null;
+    if (fs.existsSync(localStatePath)) {
+        try {
+            const raw = JSON.parse(fs.readFileSync(localStatePath, 'utf8'));
+            lastUsed = raw.profile?.last_used || null;
+        } catch (_) {}
+    }
+
+    if (!query) {
+        // 1. Si no hay query explícita, preferir el último perfil utilizado (ej. "Profile 2" / Big dady)
+        if (lastUsed) {
+            const matchLast = profiles.find(p => p.directory.toLowerCase() === String(lastUsed).toLowerCase());
+            if (matchLast) return matchLast;
+        }
+        return profiles.find(p => p.isDefault) || profiles[0] || null;
+    }
 
     const q = String(query).trim().toLowerCase();
 
@@ -66,7 +84,7 @@ export function findChromeProfile(query = '') {
     let match = profiles.find(p => p.email && p.email.toLowerCase() === q);
     if (match) return match;
 
-    // 2. Coincidencia exacta por directorio (ej. "Profile 13" o "Default")
+    // 2. Coincidencia exacta por directorio (ej. "Profile 2" o "Default")
     match = profiles.find(p => p.directory.toLowerCase() === q);
     if (match) return match;
 
@@ -97,10 +115,6 @@ export function launchChromeForProfile({
     const args = [
         `--profile-directory=${profileDir}`
     ];
-
-    if (extensionPath && fs.existsSync(extensionPath)) {
-        args.push(`--load-extension=${extensionPath}`);
-    }
 
     if (targetUrl) {
         args.push(targetUrl);

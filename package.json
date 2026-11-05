@@ -1,6 +1,6 @@
 {
   "name": "flow-veo3-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP Server + Agent Skill + WebSocket Bridge for Google Flow, Veo 3, Gemini & Google Vids with Ingredients Mode & Chrome Profile Auto-Selection",
   "type": "module",
   "main": "./mcp-stdio.js",
