@@ -848,44 +848,56 @@ const server = http.createServer(async (req, res) => {
                 if (String(err?.message || '').includes('Comando MCP desconocido')) {
                     const ratio = body.aspectRatio || '9:16';
                     const dur = body.duration || '8s';
-                    const miniSb = {
-                        titulo_proyecto: 'Video Standalone Flow',
-                        formato: ratio,
-                        personajes: Array.isArray(body.ingredients)
-                            ? body.ingredients.filter(i => typeof i === 'object' && i).map(i => ({
-                                tag: i.tag || `@${i.name || 'ing'}`,
-                                nombre: i.name || i.tag || 'Ingrediente',
-                                prompt: i.description || i.prompt || '',
-                                src: i.image || null
-                            }))
-                            : [],
-                        hero_assets: [],
-                        escenas: [{
-                            numero: 1,
-                            prompt: body.prompt,
-                            animPrompt: `escena-1: ${body.prompt}`,
-                            aspectRatio: ratio,
-                            duration: dur,
-                            duracion_seg: parseInt(dur, 10) || 8
-                        }]
-                    };
-                    await sendCommandToExtension('inject_storyboard', {
-                        storyboard: miniSb,
-                        settings: {
+                    const targetIdx = Number(body.sceneIndex || 0);
+                    const reuseExistingImage = body.videoMode === 'frames' || Boolean(body.baseImage) || Boolean(body.useExistingSceneImage);
+
+                    if (!reuseExistingImage) {
+                        const miniSb = {
+                            titulo_proyecto: 'Video Standalone Flow',
+                            formato: ratio,
+                            personajes: Array.isArray(body.ingredients)
+                                ? body.ingredients.filter(i => typeof i === 'object' && i).map(i => ({
+                                    tag: i.tag || `@${i.name || 'ing'}`,
+                                    nombre: i.name || i.tag || 'Ingrediente',
+                                    prompt: i.description || i.prompt || '',
+                                    src: i.image || null
+                                }))
+                                : [],
+                            hero_assets: [],
+                            escenas: [{
+                                numero: 1,
+                                prompt: body.prompt,
+                                animPrompt: `escena-1: ${body.prompt}`,
+                                aspectRatio: ratio,
+                                duration: dur,
+                                duracion_seg: parseInt(dur, 10) || 8
+                            }]
+                        };
+                        await sendCommandToExtension('inject_storyboard', {
+                            storyboard: miniSb,
+                            settings: {
+                                aspectRatio: ratio,
+                                videoGeneratorSource: body.engine || 'flow',
+                                directVideoChars: true,
+                                sceneCount: 1,
+                                duration: parseInt(dur, 10) || 8
+                            }
+                        });
+                    } else {
+                        await sendCommandToExtension('autoconfig_project', {
                             aspectRatio: ratio,
                             videoGeneratorSource: body.engine || 'flow',
-                            directVideoChars: body.videoMode !== 'frames',
-                            sceneCount: 1,
+                            directVideoChars: false,
                             duration: parseInt(dur, 10) || 8
-                        }
-                    });
+                        });
+                    }
                     result = await sendCommandToExtension('regenerate_scene_video', {
-                        sceneIndex: 0,
-                        customAnimPrompt: `escena-1: ${body.prompt}`
+                        sceneIndex: targetIdx,
+                        customAnimPrompt: `escena-${targetIdx + 1}: ${body.prompt}`
                     });
                     try {
                         const exported = await sendCommandToExtension('export_assets', {});
-                        const vid0 = (exported?.videos || []).find(v => Number(v.index) === 0);
+                        const vid0 = (exported?.videos || []).find(v => Number(v.index) === targetIdx);
                         if (vid0) {
                             result.base64Data = vid0.base64Data || result.base64Data;
                             result.downloadedFilename = vid0.downloadedFilename || result.downloadedFilename;
