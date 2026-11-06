@@ -7,7 +7,10 @@
   "bin": {
     "flow-veo3-mcp": "./mcp-stdio.js",
     "flow-veo3-install": "./install.js",
-    "flow-veo3-cli": "./cli.js"
+    "flow-veo3-cli": "./cli.js",
+    "flow-lite-mcp": "./flow-lite-mcp/mcp-stdio.js",
+    "flow-lite-install": "./flow-lite-mcp/install.js",
+    "flow-lite-cli": "./flow-lite-mcp/cli.js"
   },
   "files": [
     "install.js",
@@ -16,6 +19,7 @@
     "cli.js",
     "chromeProfileResolver.js",
     "masterPromptLocal.js",
+    "flow-lite-mcp/",
     "skills/",
     "README.md"
   ],

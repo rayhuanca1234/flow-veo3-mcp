@@ -1,0 +1,11 @@
+{
+  "name": "flow-lite-mcp",
+  "version": "1.0.0",
+  "description": "MCP ultraligero y directo para generar imágenes, vídeos (con UUIDs de ingredientes y Start/End Frames), música y voz en las apps web (Google Flow, Gemini, Google Vids)",
+  "type": "module",
+  "bin": {
+    "flow-lite-mcp": "./mcp-stdio.js",
+    "flow-lite-install": "./install.js",
+    "flow-lite-cli": "./cli.js"
+  }
+}

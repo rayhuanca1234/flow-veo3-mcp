@@ -1,0 +1,32 @@
+{
+  "lastImageUuid": "45f9e51d-bc1c-4e99-b428-38a66b955d06",
+  "lastVideoUuid": null,
+  "assets": [
+    {
+      "uuid": "45f9e51d-bc1c-4e99-b428-38a66b955d06",
+      "tag": "@perro_gato",
+      "name": "perro_y_gato",
+      "type": "image",
+      "engine": "flow",
+      "aspectRatio": "16:9",
+      "prompt": "Un cachorro golden retriever y un gatito naranja esponjoso sentados juntos sobre el césped verde de un jardín iluminado por la luz dorada del atardecer, fotografía cinematográfica 8k ultra realista, bokeh suave",
+      "src": "https://flow-content.google/image/45f9e51d-bc1c-4e99-b428-38a66b955d06?Expires=1793950524&KeyName=labs-flow-prod-cdn-key&Signature=6V3mUVe4GPrVJFFK3F1n-A41nLw",
+      "savedFilePath": "E:\\Downloads\\generador-AIvideo2026\\app-generador_de_videos-v2-2026\\workspace-assets\\standalone\\perro_y_gato.png",
+      "createdAt": "2026-11-06T01:35:33.000Z"
+    },
+    {
+      "uuid": null,
+      "tag": "@perro_gato_video",
+      "name": "perro_y_gato_animado",
+      "type": "video",
+      "engine": "flow",
+      "videoMode": "Fotogramas",
+      "startFrameUuid": "45f9e51d-bc1c-4e99-b428-38a66b955d06",
+      "aspectRatio": "16:9",
+      "duration": "8s",
+      "prompt": "El cachorro golden retriever y el gatito naranja esponjoso cobran vida sobre el césped soleado al atardecer",
+      "savedFilePath": "E:\\Downloads\\generador-AIvideo2026\\app-generador_de_videos-v2-2026\\workspace-assets\\standalone\\perro_y_gato_animado.mp4",
+      "createdAt": "2026-11-06T01:47:51.000Z"
+    }
+  ]
+}
