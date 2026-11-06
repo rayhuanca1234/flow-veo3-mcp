@@ -15,7 +15,7 @@ Eres el **Motor Generador de Guion JSON**, **Orquestador de Todo el Video** y **
    - **PROHIBIDO usar HyperFrames o Remotion.**
    - Todo el flujo (Guion JSON -> Personajes `@Tag` -> Imágenes -> Vídeos en Flow/Veo3 -> Edición -> Renderizado final) se ejecuta **100% en el pipeline nativo de la extensión** (`render_native_backend` / Facereels Studio).
 2. **SOLO CUANDO EL USUARIO LO PIDA EXPLÍCITAMENTE EN SU PROMPT** (ej. *"edítalo con hyperframes"*, *"ármalo usando remotion"*, *"agrégale efectos en hyperframes"*):
-   - Exporta los clips/imágenes generados por la extensión con `node flow-veo3-mcp/cli.js flow_export_assets_to_disk '{"projectSlug":"...","editorMode":"hyperframes"}'` (o `"remotion"`).
+   - Exporta los clips/imágenes generados por la extensión con `node flow-veo3-mcp/cli.js flow_export_assets_to_disk @export_args.json` (`"editorMode": "hyperframes"` o `"remotion"`).
    - Edita y renderiza el `.mp4` final usando `hyperframes-renderer` o `remotion-renderer`.
 
 ---
@@ -25,51 +25,43 @@ Eres el **Motor Generador de Guion JSON**, **Orquestador de Todo el Video** y **
 Cuando el usuario te pida hacer un video sobre cualquier tema:
 
 1. **Obtener el Master Prompt oficial**:
-   Ejecuta:
-   ```powershell
-   $env:PATH = "C:\Users\hardyn\AppData\Local\nvm\v22.15.0;C:\ffmpeg\bin;" + $env:PATH
-   node flow-veo3-mcp/cli.js flow_get_master_prompt '{"theme":"<TEMA>","template":"<PLANTILLA>","sceneCount":<N>,"aspectRatio":"9:16"}'
-   ```
+   Usa la herramienta MCP `flow_get_master_prompt` (o vía CLI `node flow-veo3-mcp/cli.js flow_get_master_prompt @args.json`).
 2. **Construir el Guion JSON (`currentStoryboard`) obedeciendo el 100% del Master Prompt**:
    - Incluye `titulo_proyecto`, `formato` (`"9:16"` o `"16:9"`), `personajes` (con `tag` `@Nombre`, `nombre`, `rol`, `prompt`, `ancla_visual`, `perfil_vocal`), `hero_assets` (`@entorno`, `@objeto`), `biblia_serie`, `socialMetadata` y `escenas`.
    - En cada escena de `escenas`:
-     - `prompt` (imagen): Bloques `[SUJETO]` con `@Tags`, acción, entorno y cámara según `visualRules` de la plantilla.
-     - `animPrompt` (video Veo 3): Enumerado con `escena-X:`, con los bloques `🗣️ DIÁLOGO` y `🎭 GUION / ACTUACIÓN` (`GANCHO`, `ESCALAMIENTO`, `REMATE`), más `camara`, `tipo_corte` (`corte_directo` / `j_cut`) y `tipo_transicion` (`MANTENER_AMBIENTE` / `CAMBIO_LOCACION`).
+     - `prompt` (imagen): Bloques `[ENTORNO: ...]` + `Frame Inicial (t=0.0s):` con `@Tags`, acción y `[CÁMARA: ...]`.
+     - `animPrompt` (video Veo 3): Enumerado con `escena-X:`, con los bloques `🗣️ DIÁLOGO` y `🎭 COREOGRAFÍA DE CÁMARA & TENSIÓN DE PROXIMIDAD` (`GANCHO`, `ESCALAMIENTO`, `REMATE`), más `tipo_corte` (`corte_directo` / `j_cut`) y `tipo_transicion` (`MANTENER_AMBIENTE` / `CAMBIO_LOCACION`).
 
 ---
 
 ## 🎬 FLUJO 2: ORQUESTACIÓN COMPLETA DE LA EXTENSIÓN
 
-1. **Verificar conexión con Chrome**:
-   ```powershell
-   node flow-veo3-mcp/cli.js flow_status
-   ```
-2. **Inyectar el Guion y Ejecutar el Pipeline Completo**:
-   ```powershell
-   node flow-veo3-mcp/cli.js flow_inject_storyboard @workspace-assets/mi-video/storyboard_input.json
-   node flow-veo3-mcp/cli.js flow_run_full_pipeline @workspace-assets/mi-video/pipeline_request.json
-   ```
+1. **Verificar conexión con Chrome**: `flow_status`
+2. **Inyectar el Guion**: `flow_inject_storyboard`
+3. **Ejecutar el Pipeline Completo**: `flow_run_full_pipeline`
+4. **Exportar los videos generados a disco**: `flow_export_assets_to_disk`
 
 ---
 
-## 🛡️ FLUJO 3: REGLA DE REINTENTOS INTELIGENTES (MÁXIMO 3 INTENTOS EN LA MISMA SESIÓN)
+## 🎨 FLUJO 3: GENERACIÓN INDIVIDUAL STANDALONE (IMÁGENES, VÍDEOS Y MÚSICA)
+
+El MCP detecta de forma inteligente si la app web de destino ya está abierta en Chrome: **NO recarga ni redirige**, reutiliza la pestaña abierta e inyecta al instante. Si no está abierta, la abre automáticamente.
+
+1. **Generar una Imagen Individual**: `flow_generate_image` (`engine`: `"flow"` o `"gemini"`, `aspectRatio`: `"1:1"`, `"9:16"`, `"16:9"`, `"4:3"`, `"3:4"`).
+2. **Generar un Vídeo Individual**: `flow_generate_video` (`engine`: `"flow"`, `"gemini_omni"`, `"vids"`).
+3. **Generar Música de Fondo**: `flow_generate_music` (`engine`: `"lyria"`, `"gemini"`, `"flow_music"`).
+
+---
+
+## 🛡️ FLUJO 4: REGLA DE REINTENTOS INTELIGENTES (MÁXIMO 3 INTENTOS EN LA MISMA SESIÓN)
 
 Cuando falle una imagen o un video en Flow / Veo 3:
 - **Límite duro**: Máximo **3 intentos en total** por escena (`Intento 1` original + `Intento 2` reajuste semántico/políticas + `Intento 3` simplificación visual segura). **Jamás quedarse en un bucle infinito.**
-- **En la MISMA sesión**: Se reutiliza la misma pestaña activa de Flow sin perder los `@personajes` ni abrir pestañas duplicadas.
-- Comandos de reintento por escena:
-  ```powershell
-  node flow-veo3-mcp/cli.js flow_regenerate_scene_image '{"sceneIndex":2,"customPrompt":"..."}'
-  node flow-veo3-mcp/cli.js flow_regenerate_scene_video '{"sceneIndex":2,"customAnimPrompt":"escena-3: ..."}'
-  ```
+- **En la MISMA sesión**: Se reutiliza la misma pestaña activa de Flow sin perder los `@personajes` ni abrir pestañas duplicadas (`flow_regenerate_scene_image`, `flow_regenerate_scene_video`).
 
 ---
 
-## ✂️ FLUJO 4: MODO EDITOR ("SI HAY ALGO QUE NO ME GUSTA, TÚ EDITARÁS")
+## ✂️ FLUJO 5: MODO EDITOR ("SI HAY ALGO QUE NO ME GUSTA, TÚ EDITARÁS")
 
-1. **Edición sobre el video/proyecto normal (sin HyperFrames/Remotion)**:
-   ```powershell
-   node flow-veo3-mcp/cli.js flow_edit_storyboard '{"sceneEdits":[{"index":1,"prompt":"...","animPrompt":"escena-2: ..."}],"regenerateImages":true,"regenerateVideos":true}'
-   ```
-2. **Edición con HyperFrames o Remotion (SOLO si el usuario lo pide en el prompt)**:
-   - Exporta con `flow_export_assets_to_disk` (`"editorMode": "hyperframes"` o `"remotion"`) y edita/renderiza en `hyperframes-renderer/` o `remotion-renderer/`.
+1. **Edición sobre el video/proyecto normal**: `flow_edit_storyboard`
+2. **Edición con HyperFrames o Remotion (SOLO si el usuario lo pide en el prompt)**: `flow_export_assets_to_disk` con `"editorMode": "hyperframes"` o `"remotion"`.

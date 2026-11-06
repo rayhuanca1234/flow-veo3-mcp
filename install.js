@@ -50,12 +50,15 @@ async function runInstaller() {
         copyDirRecursive(__dirname, localMcpDir);
     }
 
-    // 3. Instalar la Skill en el workspace actual (.agents/skills/flow-video-orchestrator/SKILL.md)
+    // 3. Instalar la Skill tanto globalmente (~/.gemini/antigravity/skills/) como en el workspace actual (.agents/skills/)
     const bundledSkillDir = path.join(__dirname, 'skills', 'flow-video-orchestrator');
+    const globalSkillDir = path.join(agyConfigDir, 'skills', 'flow-video-orchestrator');
     const destSkillDir = path.join(targetWorkspace, '.agents', 'skills', 'flow-video-orchestrator');
     if (fs.existsSync(bundledSkillDir)) {
+        copyDirRecursive(bundledSkillDir, globalSkillDir);
         copyDirRecursive(bundledSkillDir, destSkillDir);
-        console.log(`✅ Skill instalada en: ${destSkillDir}`);
+        console.log(`✅ Skill instalada globalmente en: ${globalSkillDir}`);
+        console.log(`✅ Skill instalada en workspace: ${destSkillDir}`);
     }
 
     // 4. Registrar en ~/.gemini/antigravity/mcp_config.json apuntando a la ruta global permanente

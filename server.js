@@ -273,7 +273,7 @@ async function exportAndSaveAssetsToDisk({
     editorMode = 'native',
     overwriteOriginals = false
 } = {}) {
-    const exported = await sendCommandToExtension('export_assets', {}, 120000);
+    const exported = await sendCommandToExtension('export_assets', {}, 600000);
     const titleSlug = exported.storyboard?.titulo_proyecto
         ? String(exported.storyboard.titulo_proyecto).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48)
         : null;
