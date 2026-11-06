@@ -1,67 +1,108 @@
 ---
 name: flow-video-orchestrator
-description: Motor Generador de Guion JSON (basado 100% en el Master Prompt de la extensión), Orquestador Autónomo de Producción de Video (Flow / Veo 3 / Gemini / Vids / Facereels) y Editor en Vivo. Úsalo siempre que el usuario pida crear un video de un tema, generar un guion JSON, orquestar la extensión para Flow/Veo3, reintentar escenas fallidas o editar escenas/videos existentes.
+description: Motor Generador de Medios Individuales (Imagen, Vídeo con Ingredientes, Voz en Off, Música en Flow / Veo 3 / Gemini / Vids), Motor de Guion JSON (Master Prompt) y Orquestador Híbrido con HyperFrames / Remotion / Nativo.
 ---
 
-# Flow / Veo 3 Video Orchestrator, Master Prompt Script Engine & Live Editor
+# Flow / Veo 3 / Gemini / Vids MCP — Generador Individual de Medios & Orquestador
 
-Eres el **Motor Generador de Guion JSON**, **Orquestador de Todo el Video** y **Editor en Vivo** conectado a la extensión de Chrome `AI Auto-Prompt` a través de `flow-veo3-mcp` (`http://127.0.0.1:3847` / `ws://127.0.0.1:3847/ws`).
-
----
-
-## 🚨 REGLA DE ORO SOBRE HYPERFRAMES Y REMOTION (MANDATORIA)
-
-1. **POR DEFECTO (cuando el usuario NO mencione explícitamente HyperFrames ni Remotion en su prompt)**:
-   - **PROHIBIDO usar HyperFrames o Remotion.**
-   - Todo el flujo (Guion JSON -> Personajes `@Tag` -> Imágenes -> Vídeos en Flow/Veo3 -> Edición -> Renderizado final) se ejecuta **100% en el pipeline nativo de la extensión** (`render_native_backend` / Facereels Studio).
-2. **SOLO CUANDO EL USUARIO LO PIDA EXPLÍCITAMENTE EN SU PROMPT** (ej. *"edítalo con hyperframes"*, *"ármalo usando remotion"*, *"agrégale efectos en hyperframes"*):
-   - Exporta los clips/imágenes generados por la extensión con `node flow-veo3-mcp/cli.js flow_export_assets_to_disk @export_args.json` (`"editorMode": "hyperframes"` o `"remotion"`).
-   - Edita y renderiza el `.mp4` final usando `hyperframes-renderer` o `remotion-renderer`.
+Estás conectado a Google Chrome (`AI Auto-Prompt`) mediante **`flow-veo3-mcp`** (`http://127.0.0.1:3847` / `ws://127.0.0.1:3847/ws`).
 
 ---
 
-## 🧠 FLUJO 1: MOTOR GENERADOR DE GUION JSON (100% MASTER PROMPT)
+## 🎯 MODO 1: GENERACIÓN INDIVIDUAL MODULAR (PARA COMBINAR CON HYPERFRAMES, REMOTION O EDICIÓN A MEDIDA)
 
-Cuando el usuario te pida hacer un video sobre cualquier tema:
+Usa estas herramientas individuales cuando el usuario te pida:
+- Generar **1 imagen** o **varias imágenes individuales** (en Flow, Gemini o Vids).
+- Generar **1 video** o **clips individuales con ingredientes `@Tag`** (en Flow Veo 3, Gemini Omni/Veo o Google Vids).
+- Hacer un video **combinando Flow/Gemini/Vids + HyperFrames o Remotion** (ej. *"hazme un video con Flow y agrégale subtítulos y efectos con HyperFrames"*, o *"hazme un video con imágenes, voz en off y efectos en HyperFrames"*).
 
-1. **Obtener el Master Prompt oficial**:
-   Usa la herramienta MCP `flow_get_master_prompt` (o vía CLI `node flow-veo3-mcp/cli.js flow_get_master_prompt @args.json`).
-2. **Construir el Guion JSON (`currentStoryboard`) obedeciendo el 100% del Master Prompt**:
-   - Incluye `titulo_proyecto`, `formato` (`"9:16"` o `"16:9"`), `personajes` (con `tag` `@Nombre`, `nombre`, `rol`, `prompt`, `ancla_visual`, `perfil_vocal`), `hero_assets` (`@entorno`, `@objeto`), `biblia_serie`, `socialMetadata` y `escenas`.
-   - En cada escena de `escenas`:
-     - `prompt` (imagen): Bloques `[ENTORNO: ...]` + `Frame Inicial (t=0.0s):` con `@Tags`, acción y `[CÁMARA: ...]`.
-     - `animPrompt` (video Veo 3): Enumerado con `escena-X:`, con los bloques `🗣️ DIÁLOGO` y `🎭 COREOGRAFÍA DE CÁMARA & TENSIÓN DE PROXIMIDAD` (`GANCHO`, `ESCALAMIENTO`, `REMATE`), más `tipo_corte` (`corte_directo` / `j_cut`) y `tipo_transicion` (`MANTENER_AMBIENTE` / `CAMBIO_LOCACION`).
+### Herramientas Individuales (Guardan automáticamente el archivo en disco y devuelven `savedFilePath`):
+
+1. **Registrar o Generar un Ingrediente (`@Tag`)**:
+   ```powershell
+   node flow-veo3-mcp/cli.js flow_add_ingredient @ingrediente.json
+   ```
+   - Ejemplo JSON:
+     ```json
+     {
+       "tag": "@protagonista",
+       "name": "Protagonista",
+       "type": "character",
+       "description": "Joven de 25 años con chaqueta de cuero roja y mirada intensa",
+       "image": "ruta/opcional.png",
+       "generateInFlow": true,
+       "outputPath": "workspace-assets/mi-video/personaje.png"
+     }
+     ```
+
+2. **Generar 1 Imagen Individual (`flow_generate_image`)**:
+   - Soporta motores: `"flow"` (Google Flow Imagen 3), `"gemini"` (Google Gemini Imagen 3), `"vids"` (Google Vids), `"google_images"`.
+   - Soporta aspectos: `"9:16"`, `"16:9"`, `"1:1"`, `"4:3"`, `"3:4"`.
+   - Adjunta automáticamente cualquier `@tag` en `ingredients` o escrito en el `prompt`.
+   - Descarga y guarda el `.png` en `outputPath` y devuelve `savedFilePath`.
+   ```json
+   {
+     "prompt": "@protagonista en una calle lluviosa de Tokio con luces de neón, plano medio 85mm",
+     "engine": "flow",
+     "aspectRatio": "9:16",
+     "ingredients": ["@protagonista"],
+     "outputPath": "workspace-assets/mi-video/img_01.png"
+   }
+   ```
+
+3. **Generar 1 Vídeo Individual con Ingredientes o Fotogramas (`flow_generate_video`)**:
+   - Soporta motores: `"flow"` (Flow Veo 3), `"gemini_omni"` (Gemini Omni Video / Veo), `"vids"` (Google Vids Veo 3).
+   - Soporta `videoMode`: `"ingredients"` (genera directo desde texto + `@tags`) o `"frames"` (anima `baseImage`).
+   - Soporta `aspectRatio`: `"9:16"`, `"16:9"`, `"1:1"` y `duration`: `"4s"`, `"8s"`.
+   - Espera al 100%, descarga el `.mp4` a `outputPath` y devuelve `savedFilePath`.
+   ```json
+   {
+     "prompt": "@protagonista camina hacia la cámara bajo la lluvia de neón mientras dice: 'Nunca debiste subestimarme', cámara lenta cinematográfica",
+     "engine": "flow",
+     "videoMode": "ingredients",
+     "aspectRatio": "9:16",
+     "duration": "8s",
+     "ingredients": ["@protagonista"],
+     "outputPath": "workspace-assets/mi-video/clip_01.mp4"
+   }
+   ```
+
+4. **Generar Voz en Off Individual (`flow_generate_voiceover`)**:
+   - Sintetiza locución en `.mp3` y devuelve `savedFilePath` listo para sincronizar subtítulos y audio en HyperFrames/Remotion/FFmpeg.
+   ```json
+   {
+     "text": "En el corazón de la ciudad, nadie imaginaba lo que estaba a punto de ocurrir.",
+     "lang": "es",
+     "outputPath": "workspace-assets/mi-video/voz_01.mp3"
+   }
+   ```
+
+5. **Generar Música de Fondo Individual (`flow_generate_music`)**:
+   - Motores: `"lyria"` (Google Vids Lyria 3), `"gemini"` (Modo Música), `"flow_music"` (Flow Music web).
+   ```json
+   {
+     "prompt": "Dark cyberpunk synthwave with deep bass and cinematic tension",
+     "engine": "lyria",
+     "duration": "full"
+   }
+   ```
+
+### Flujo de Trabajo cuando el usuario pide HyperFrames o Remotion:
+1. Genera los clips `.mp4` con `flow_generate_video` o las imágenes `.png` con `flow_generate_image` (y si pide locución, usa `flow_generate_voiceover`).
+2. Toma las rutas locales devueltas en `savedFilePath` y cópialas al proyecto de **HyperFrames** (`hyperframes-renderer/`) o **Remotion** (`remotion-renderer/`).
+3. Añade los subtítulos animados, efectos visuales, transiciones y renderiza el `.mp4` final.
 
 ---
 
-## 🎬 FLUJO 2: ORQUESTACIÓN COMPLETA DE LA EXTENSIÓN
+## 🧠 MODO 2: PIPELINE COMPLETO CON MASTER PROMPT (CUANDO NO SE PIDE HYPERFRAMES NI REMOTION)
 
-1. **Verificar conexión con Chrome**: `flow_status`
-2. **Inyectar el Guion**: `flow_inject_storyboard`
-3. **Ejecutar el Pipeline Completo**: `flow_run_full_pipeline`
-4. **Exportar los videos generados a disco**: `flow_export_assets_to_disk`
-
----
-
-## 🎨 FLUJO 3: GENERACIÓN INDIVIDUAL STANDALONE (IMÁGENES, VÍDEOS Y MÚSICA)
-
-El MCP detecta de forma inteligente si la app web de destino ya está abierta en Chrome: **NO recarga ni redirige**, reutiliza la pestaña abierta e inyecta al instante. Si no está abierta, la abre automáticamente.
-
-1. **Generar una Imagen Individual**: `flow_generate_image` (`engine`: `"flow"` o `"gemini"`, `aspectRatio`: `"1:1"`, `"9:16"`, `"16:9"`, `"4:3"`, `"3:4"`).
-2. **Generar un Vídeo Individual**: `flow_generate_video` (`engine`: `"flow"`, `"gemini_omni"`, `"vids"`).
-3. **Generar Música de Fondo**: `flow_generate_music` (`engine`: `"lyria"`, `"gemini"`, `"flow_music"`).
+Si el usuario pide un video completo por tema y **NO menciona HyperFrames ni Remotion**:
+1. Obtén el Master Prompt con `flow_get_master_prompt`.
+2. Inyecta el guion JSON con `flow_inject_storyboard`.
+3. Ejecuta `flow_run_full_pipeline` y exporta con `flow_export_assets_to_disk`.
 
 ---
 
-## 🛡️ FLUJO 4: REGLA DE REINTENTOS INTELIGENTES (MÁXIMO 3 INTENTOS EN LA MISMA SESIÓN)
+## 🛡️ REGLA ESTRICTA DE REINTENTOS (MÁX. 3 INTENTOS EN LA MISMA SESIÓN)
 
-Cuando falle una imagen o un video en Flow / Veo 3:
-- **Límite duro**: Máximo **3 intentos en total** por escena (`Intento 1` original + `Intento 2` reajuste semántico/políticas + `Intento 3` simplificación visual segura). **Jamás quedarse en un bucle infinito.**
-- **En la MISMA sesión**: Se reutiliza la misma pestaña activa de Flow sin perder los `@personajes` ni abrir pestañas duplicadas (`flow_regenerate_scene_image`, `flow_regenerate_scene_video`).
-
----
-
-## ✂️ FLUJO 5: MODO EDITOR ("SI HAY ALGO QUE NO ME GUSTA, TÚ EDITARÁS")
-
-1. **Edición sobre el video/proyecto normal**: `flow_edit_storyboard`
-2. **Edición con HyperFrames o Remotion (SOLO si el usuario lo pide en el prompt)**: `flow_export_assets_to_disk` con `"editorMode": "hyperframes"` o `"remotion"`.
+- Si una imagen o video falla en Flow/Veo3, se reintenta en la misma sesión ajustando el prompt hasta un máximo estricto de **3 intentos totales** (`1 original + 2 reintentos`). Jamás permitas bucles infinitos.

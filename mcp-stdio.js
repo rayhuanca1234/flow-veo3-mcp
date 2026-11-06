@@ -99,7 +99,7 @@ export const MCP_TOOLS = [
     },
     {
         name: 'flow_add_ingredient',
-        description: 'Registra un ingrediente (personaje, objeto, locación o estilo visual) con su @Tag y su imagen de referencia (ruta local en disco, URL o Base64) para que Flow, Gemini y Vids lo reconozcan y mantengan consistencia.',
+        description: 'Registra o genera un ingrediente individual (personaje, objeto, locación o estilo visual) con su @Tag y su imagen de referencia (ruta local en disco, URL, Base64 o generada en Flow) y lo guarda en disco para usarlo en Flow, Gemini, Vids o HyperFrames.',
         inputSchema: {
             type: 'object',
             required: ['tag'],
@@ -108,7 +108,24 @@ export const MCP_TOOLS = [
                 name: { type: 'string', description: 'Nombre descriptivo del personaje u objeto' },
                 type: { type: 'string', enum: ['character', 'location', 'prop', 'style'], default: 'character', description: 'Tipo de entidad' },
                 image: { type: 'string', description: 'Ruta de archivo local en disco (ej. "C:\\fotos\\carlos.png" o "workspace-assets\\carlos.png"), URL HTTP o base64 DataURL' },
-                description: { type: 'string', description: 'Descripción física o ancla visual del ingrediente' }
+                description: { type: 'string', description: 'Descripción física o ancla visual del ingrediente' },
+                generateInFlow: { type: 'boolean', default: false, description: 'Si es true y no se da imagen local, genera automáticamente la imagen del ingrediente en Google Flow' },
+                aspectRatio: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
+                outputPath: { type: 'string', description: 'Ruta opcional donde guardar el archivo .png del ingrediente en disco' }
+            }
+        }
+    },
+    {
+        name: 'flow_generate_voiceover',
+        description: 'Genera una pista de voz en off (TTS) individual en MP3 lista para ensamblar con HyperFrames, Remotion o FFmpeg y devuelve la ruta exacta en disco (savedFilePath).',
+        inputSchema: {
+            type: 'object',
+            required: ['text'],
+            properties: {
+                text: { type: 'string', description: 'Texto a locutar en voz en off' },
+                lang: { type: 'string', default: 'es', description: 'Idioma de la voz (es, en, pt, fr, ko, ja)' },
+                voice: { type: 'string', default: 'es-MX-DaliaNeural', description: 'Voz neural opcional (si se usa edge-tts)' },
+                outputPath: { type: 'string', description: 'Ruta en disco donde guardar el archivo .mp3 (ej. "workspace-assets/mi-video/voz.mp3")' }
             }
         }
     },
@@ -140,33 +157,34 @@ export const MCP_TOOLS = [
     },
     {
         name: 'flow_generate_image',
-        description: 'Genera una imagen ultra realista o estilizada con Google Flow (Imagen 3), Google Gemini o Google Vids, controlando la relación de aspecto (9:16, 16:9, 1:1, 4:3, 3:4) y adjuntando ingredientes/personajes (@Tag).',
+        description: 'Genera 1 imagen individual en Google Flow (Imagen 3), Google Gemini o Google Vids, adjuntando ingredientes/personajes (@Tag), espera a que termine y la guarda automáticamente en disco (savedFilePath) lista para HyperFrames, Remotion o edición.',
         inputSchema: {
             type: 'object',
             required: ['prompt'],
             properties: {
-                prompt: { type: 'string', description: 'Prompt descriptivo para generar la imagen' },
+                prompt: { type: 'string', description: 'Prompt descriptivo para generar la imagen (puedes incluir @tags de ingredientes)' },
                 engine: { type: 'string', enum: ['flow', 'gemini', 'vids', 'google_images'], default: 'flow', description: 'Motor generador de imagen: flow (Google Flow Imagen 3), gemini (Google Gemini Imagen 3), vids (Google Vids), google_images (Búsqueda/Nano)' },
                 aspectRatio: { type: 'string', enum: ['9:16', '16:9', '1:1', '4:3', '3:4'], default: '9:16', description: 'Relación de aspecto de la imagen' },
                 ingredients: {
                     type: 'array',
-                    description: 'Ingredientes o personajes de referencia: array de objetos [{ tag: "@carlos", name: "Carlos", image: "ruta/o/base64" }] o strings con tags ya registrados'
+                    description: 'Ingredientes o personajes de referencia: array de objetos [{ tag: "@carlos", name: "Carlos", image: "ruta/o/base64", description: "..." }] o strings con @tags ya registrados'
                 },
                 style: { type: 'string', description: 'Estilo visual opcional (ej. "cinemático 35mm", "anime 3d", "hiperrealista")' },
                 negativePrompt: { type: 'string', description: 'Prompt negativo opcional' },
+                outputPath: { type: 'string', description: 'Ruta en disco donde guardar la imagen .png (ej. "workspace-assets/mi-video/img_01.png")' },
                 account: { type: 'string', description: 'Cuenta/correo o perfil de Chrome a usar' },
-                sceneIndex: { type: 'number', default: 0, description: 'Índice de escena opcional' }
+                sceneIndex: { type: 'number', default: 0, description: 'Índice de slot opcional' }
             }
         }
     },
     {
         name: 'flow_generate_video',
-        description: 'Genera un vídeo con Google Flow (Veo 3), Google Gemini (Omni Video / Veo) o Google Vids (Veo 3). Soporta modo ingredientes (genera directo desde texto + personajes @Tag sin imagen base) o modo fotogramas (anima una imagen base), aspectos 9:16, 16:9, 1:1, duraciones 4s/8s y calidades 360p/720p con máx. 3 intentos inteligentes.',
+        description: 'Genera 1 vídeo individual (.mp4) con Google Flow (Veo 3), Google Gemini (Omni Video / Veo) o Google Vids (Veo 3) con ingredientes (@Tag) o imagen base, espera al 100% y lo descarga directamente a disco (savedFilePath) listo para añadirle subtítulos/efectos con HyperFrames, Remotion o FFmpeg.',
         inputSchema: {
             type: 'object',
             required: ['prompt'],
             properties: {
-                prompt: { type: 'string', description: 'Prompt descriptivo de animación, movimiento de cámara y acción' },
+                prompt: { type: 'string', description: 'Prompt descriptivo de animación, movimiento de cámara, diálogo y acción (puedes incluir @tags de ingredientes)' },
                 engine: { type: 'string', enum: ['flow', 'gemini_omni', 'vids'], default: 'flow', description: 'Motor de vídeo: flow (Flow Veo 3), gemini_omni (Gemini Omni Video / Veo), vids (Google Vids Veo 3)' },
                 videoMode: { type: 'string', enum: ['ingredients', 'frames'], default: 'ingredients', description: '"ingredients" (crea vídeo directo a partir de texto y personajes @Tag sin requerir imagen previa) o "frames" (anima una imagen previa)' },
                 modelFamily: { type: 'string', enum: ['Omni 1.1 Flash', 'Veo 3.1 Fast', 'Veo 3 Quality'], default: 'Omni 1.1 Flash', description: 'Familia de modelo de Flow/Veo 3' },
@@ -175,9 +193,10 @@ export const MCP_TOOLS = [
                 resolution: { type: 'string', enum: ['360p', '720p'], default: '720p', description: 'Resolución: 360p (más rápido) o 720p (alta calidad)' },
                 outputsCount: { type: 'string', enum: ['x1', 'x2', 'x4'], default: 'x1', description: 'Número de salidas generadas' },
                 baseImage: { type: 'string', description: 'Ruta local en disco, URL o base64 de la imagen inicial a animar (usado en modo "frames")' },
-                ingredients: { type: 'array', description: 'Ingredientes o personajes @Tag a asociar en la escena' },
+                ingredients: { type: 'array', description: 'Ingredientes o personajes @Tag a adjuntar en la generación' },
+                outputPath: { type: 'string', description: 'Ruta en disco donde guardar el archivo .mp4 generado (ej. "workspace-assets/mi-video/clip_01.mp4")' },
                 account: { type: 'string', description: 'Cuenta/correo o perfil de Chrome a usar' },
-                sceneIndex: { type: 'number', default: 0, description: 'Índice de escena opcional' }
+                sceneIndex: { type: 'number', default: 0, description: 'Índice de slot opcional' }
             }
         }
     },
@@ -334,6 +353,8 @@ export async function invokeMcpTool(name, args = {}) {
             return await callBridge('/list-models', 'GET');
         case 'flow_add_ingredient':
             return await callBridge('/add-ingredient', 'POST', args);
+        case 'flow_generate_voiceover':
+            return await callBridge('/generate-voiceover', 'POST', args);
         case 'flow_generate_music':
             return await callBridge('/generate-music', 'POST', args);
         case 'flow_launch_app':

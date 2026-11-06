@@ -467,6 +467,115 @@ async function resolveFinalRenderedVideoOnDisk({ outDir, savedVideos = [], nativ
     return null;
 }
 
+async function saveStandaloneMediaToDisk({ base64Data = null, src = null, downloadedFilename = null, outputPath = null, defaultExt = 'mp4', prefix = 'media' }) {
+    const destPath = outputPath
+        ? (path.isAbsolute(outputPath) ? outputPath : path.resolve(WORKSPACE_ROOT, outputPath))
+        : path.join(ASSETS_ROOT, 'standalone', `${prefix}_${Date.now()}.${defaultExt}`);
+
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    let saved = false;
+
+    if (downloadedFilename && fs.existsSync(downloadedFilename)) {
+        fs.copyFileSync(downloadedFilename, destPath);
+        saved = true;
+    } else if (base64Data && typeof base64Data === 'string' && base64Data.startsWith('data:')) {
+        const cleanB64 = base64Data.replace(/^data:[^;]+;(?:flowuuid=[^;]+;)?base64,/, '');
+        fs.writeFileSync(destPath, Buffer.from(cleanB64, 'base64'));
+        saved = true;
+    } else if (src && typeof src === 'string' && src.startsWith('data:')) {
+        const cleanB64 = src.replace(/^data:[^;]+;(?:flowuuid=[^;]+;)?base64,/, '');
+        fs.writeFileSync(destPath, Buffer.from(cleanB64, 'base64'));
+        saved = true;
+    } else if (src && typeof src === 'string' && /^https?:\/\//i.test(src)) {
+        try {
+            const resp = await fetch(src);
+            if (resp.ok) {
+                const buf = Buffer.from(await resp.arrayBuffer());
+                if (buf.length > 500) {
+                    fs.writeFileSync(destPath, buf);
+                    saved = true;
+                }
+            }
+        } catch (_) {}
+    }
+
+    if (saved && fs.existsSync(destPath)) {
+        const stat = fs.statSync(destPath);
+        return {
+            savedFilePath: destPath,
+            sizeBytes: stat.size
+        };
+    }
+    return null;
+}
+
+async function generateStandaloneVoiceover({ text, lang = 'es', voice = 'es-MX-DaliaNeural', outputPath = null }) {
+    if (!text || typeof text !== 'string') {
+        throw new Error('Falta el texto ("text") para generar la voz en off.');
+    }
+
+    const destPath = outputPath
+        ? (path.isAbsolute(outputPath) ? outputPath : path.resolve(WORKSPACE_ROOT, outputPath))
+        : path.join(ASSETS_ROOT, 'standalone', `voiceover_${Date.now()}.mp3`);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+
+    // 1. Intentar con edge-tts si está disponible en el sistema
+    try {
+        execFileSync('edge-tts', ['--voice', voice, '--text', text, '--write-media', destPath], { stdio: 'ignore' });
+        if (fs.existsSync(destPath) && fs.statSync(destPath).size > 200) {
+            return {
+                ok: true,
+                engine: 'edge-tts',
+                voice,
+                savedFilePath: destPath,
+                sizeBytes: fs.statSync(destPath).size
+            };
+        }
+    } catch (_) {}
+
+    // 2. Fallback directo a Google TTS MP3 por fragmentos (alta calidad, 0 dependencias externas)
+    const cleanLang = String(lang || 'es').split('-')[0].toLowerCase();
+    const chunks = [];
+    const words = text.trim().split(/\s+/);
+    let current = '';
+    for (const w of words) {
+        if ((current + ' ' + w).trim().length > 180) {
+            if (current) chunks.push(current.trim());
+            current = w;
+        } else {
+            current = (current + ' ' + w).trim();
+        }
+    }
+    if (current) chunks.push(current.trim());
+
+    const buffers = [];
+    for (const chunk of chunks) {
+        const ttsUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${encodeURIComponent(cleanLang)}&q=${encodeURIComponent(chunk)}`;
+        const resp = await fetch(ttsUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+        if (resp.ok) {
+            buffers.push(Buffer.from(await resp.arrayBuffer()));
+        }
+    }
+
+    if (buffers.length === 0) {
+        throw new Error('No se pudo sintetizar el audio de voz en off.');
+    }
+
+    const finalBuf = Buffer.concat(buffers);
+    fs.writeFileSync(destPath, finalBuf);
+    return {
+        ok: true,
+        engine: 'google-tts',
+        lang: cleanLang,
+        savedFilePath: destPath,
+        sizeBytes: finalBuf.length
+    };
+}
+
 function readJsonBody(req) {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -665,22 +774,73 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'POST' && urlObj.pathname === '/generate-image') {
             const body = await readJsonBody(req);
             const result = await sendCommandToExtension('generate_image', body);
+            const savedInfo = await saveStandaloneMediaToDisk({
+                base64Data: result?.base64Data,
+                src: result?.src,
+                outputPath: body.outputPath,
+                defaultExt: 'png',
+                prefix: 'img'
+            });
+            if (result && typeof result === 'object') {
+                delete result.base64Data;
+                if (savedInfo) {
+                    result.savedFilePath = savedInfo.savedFilePath;
+                    result.sizeBytes = savedInfo.sizeBytes;
+                }
+            }
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, result }));
+            res.end(JSON.stringify({ ok: Boolean(result?.ok !== false), result }));
             return;
         }
 
         if (req.method === 'POST' && urlObj.pathname === '/generate-video') {
             const body = await readJsonBody(req);
             const result = await sendCommandToExtension('generate_video', body);
+            const savedInfo = await saveStandaloneMediaToDisk({
+                base64Data: result?.base64Data,
+                src: result?.src,
+                downloadedFilename: result?.downloadedFilename,
+                outputPath: body.outputPath,
+                defaultExt: 'mp4',
+                prefix: 'video'
+            });
+            if (result && typeof result === 'object') {
+                delete result.base64Data;
+                if (savedInfo) {
+                    result.savedFilePath = savedInfo.savedFilePath;
+                    result.sizeBytes = savedInfo.sizeBytes;
+                }
+            }
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true, result }));
+            res.end(JSON.stringify({ ok: Boolean(result?.ok !== false), result }));
             return;
         }
 
         if (req.method === 'POST' && urlObj.pathname === '/add-ingredient') {
             const body = await readJsonBody(req);
             const result = await sendCommandToExtension('add_ingredient', body);
+            const savedInfo = await saveStandaloneMediaToDisk({
+                base64Data: result?.base64Data,
+                src: result?.src,
+                outputPath: body.outputPath,
+                defaultExt: 'png',
+                prefix: `ingredient_${String(body.tag || body.name || 'item').replace(/[^a-zA-Z0-9_-]/g, '')}`
+            });
+            if (result && typeof result === 'object') {
+                delete result.base64Data;
+                if (savedInfo) {
+                    result.savedFilePath = savedInfo.savedFilePath;
+                    result.sizeBytes = savedInfo.sizeBytes;
+                }
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, result }));
+            return;
+        }
+
+        if (req.method === 'POST' && urlObj.pathname === '/generate-voiceover') {
+            const body = await readJsonBody(req);
+            const result = await generateStandaloneVoiceover(body);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, result }));
             return;
