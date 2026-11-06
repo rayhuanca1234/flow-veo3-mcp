@@ -3,6 +3,7 @@
 // MCP Ultraligero y Directo para Google Flow, Gemini y Google Vids (Imágenes, Vídeos con Ingredientes/Frames, UUIDs, Música y Voz)
 
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -103,19 +104,45 @@ export function resolveAssetReference(ref) {
     return str;
 }
 
-// ── CLIENTE HTTP ULTRARRÁPIDO AL PUENTE CHROME (127.0.0.1:3847) ──────────────
-async function callBridge(endpoint, method = 'GET', body = null) {
-    const opts = {
-        method,
-        headers: { 'Content-Type': 'application/json' }
-    };
-    if (body !== null) opts.body = JSON.stringify(body);
-    const res = await fetch(`${BRIDGE_URL}${endpoint}`, opts);
-    const data = await res.json();
-    if (!res.ok || data.ok === false) {
-        throw new Error(data.error || `Error HTTP ${res.status} en ${endpoint}`);
-    }
-    return data;
+// ── CLIENTE HTTP ULTRARRÁPIDO Y SIN TIMEOUT DE 300s AL PUENTE CHROME (127.0.0.1:3847) ──
+async function callBridge(endpoint, method = 'GET', body = null, timeoutMs = 1800000) {
+    return new Promise((resolve, reject) => {
+        const url = new URL(`${BRIDGE_URL}${endpoint}`);
+        const payload = body !== null ? JSON.stringify(body) : null;
+        const req = http.request({
+            hostname: url.hostname,
+            port: url.port || 3847,
+            path: url.pathname + url.search,
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {})
+            },
+            timeout: timeoutMs
+        }, (res) => {
+            const chunks = [];
+            res.on('data', (c) => chunks.push(c));
+            res.on('end', () => {
+                const raw = Buffer.concat(chunks).toString('utf8');
+                try {
+                    const data = JSON.parse(raw);
+                    if (res.statusCode >= 400 || data.ok === false) {
+                        reject(new Error(data.error || `Error HTTP ${res.statusCode} en ${endpoint}`));
+                    } else {
+                        resolve(data);
+                    }
+                } catch (err) {
+                    reject(new Error(`Respuesta JSON inválida en ${endpoint}: ${raw.slice(0, 200)}`));
+                }
+            });
+        });
+        req.on('timeout', () => {
+            req.destroy(new Error(`Timeout tras ${Math.round(timeoutMs / 1000)}s en ${endpoint}`));
+        });
+        req.on('error', (err) => reject(err));
+        if (payload) req.write(payload);
+        req.end();
+    });
 }
 
 // ── CATÁLOGO COMPACTO DE HERRAMIENTAS DE FLOW-LITE-MCP ───────────────────────
@@ -211,6 +238,29 @@ export const LITE_TOOLS = [
                 resolution: { type: 'string', enum: ['720p', '360p'], default: '720p' },
                 tag: { type: 'string', description: 'Etiqueta @tag opcional para registrar el vídeo resultante' },
                 outputPath: { type: 'string', description: 'Ruta en disco donde guardar el .mp4 (ej. "workspace-assets/standalone/mi_video.mp4")' }
+            }
+        }
+    },
+    {
+        name: 'lite_generate_video_batch',
+        description: 'Lanza la generación de múltiples escenas de vídeo en BLOQUE SECUENCIAL NO BLOQUEANTE en Google Flow (igual que la extensión: envía la Escena 1 y apenas Flow acepta el envío lanza de inmediato la Escena 2 sin esperar a que termine de generarse la 1, A MENOS que esté activo videoChain=true en una escena o globalmente, en cuyo caso espera a que termine la escena N-1 para usar ese vídeo como ingrediente de continuidad de escenario en la escena N). PROHIBIDO EL RENDERIZADO FINAL: jamás renderiza un vídeo unido; solo descarga los clips .mp4 individuales de la app web al disco.',
+        inputSchema: {
+            type: 'object',
+            required: ['scenes'],
+            properties: {
+                scenes: {
+                    type: 'array',
+                    description: 'Lista de escenas: [{ prompt, ingredients: ["@personaje1"], startFrame, endFrame, videoChain: false, duration: "8s", tag: "@clip1", outputPath: "ruta/clip1.mp4" }]'
+                },
+                engine: { type: 'string', enum: ['flow', 'gemini', 'vids'], default: 'flow' },
+                videoMode: { type: 'string', enum: ['ingredients', 'frames'], default: 'ingredients' },
+                aspectRatio: { type: 'string', enum: ['16:9', '9:16', '1:1'], default: '9:16' },
+                duration: { type: 'string', enum: ['4s', '6s', '8s'], default: '8s' },
+                modelFamily: { type: 'string', enum: ['Omni 1.1 Flash', 'Veo 3.1 Fast', 'Veo 3 Quality'], default: 'Omni 1.1 Flash' },
+                resolution: { type: 'string', enum: ['720p', '360p'], default: '720p' },
+                videoChain: { type: 'boolean', default: false, description: 'Si es true, la escena N espera a que termine la escena N-1 para usar su vídeo como ingrediente de continuidad de escenario' },
+                frameChain: { type: 'boolean', default: false, description: 'Si es true, extrae el último fotograma de la escena N-1 y lo usa como Start Frame de la escena N' },
+                outputDir: { type: 'string', description: 'Carpeta opcional donde guardar scene_1.mp4, scene_2.mp4...' }
             }
         }
     },
@@ -318,7 +368,19 @@ export async function invokeLiteTool(name, args = {}) {
                 });
                 return { ok: true, registeredInMemory: true, asset: saved };
             }
-            const res = await callBridge('/add-ingredient', 'POST', args);
+            const payload = { ...args };
+            let localFileResolved = null;
+            if (payload.image && typeof payload.image === 'string' && !payload.image.startsWith('data:') && !/^https?:\/\//i.test(payload.image)) {
+                const candidate = path.isAbsolute(payload.image) ? payload.image : path.resolve(process.cwd(), payload.image);
+                if (fs.existsSync(candidate)) {
+                    localFileResolved = candidate;
+                    const ext = path.extname(candidate).toLowerCase().replace('.', '') || 'png';
+                    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : (ext === 'webp' ? 'image/webp' : 'image/png');
+                    const buf = fs.readFileSync(candidate);
+                    payload.image = `data:${mime};base64,${buf.toString('base64')}`;
+                }
+            }
+            const res = await callBridge('/add-ingredient', 'POST', payload);
             const result = res.result || {};
             const saved = recordAssetInRegistry({
                 uuid: result.uuid || args.uuid || null,
@@ -326,12 +388,12 @@ export async function invokeLiteTool(name, args = {}) {
                 name: args.name || args.tag,
                 type: 'ingredient',
                 engine: 'flow',
-                aspectRatio: args.aspectRatio || '16:9',
+                aspectRatio: args.aspectRatio || '9:16',
                 prompt: args.description || '',
                 src: result.src || null,
-                savedFilePath: result.savedFilePath || null
+                savedFilePath: result.savedFilePath || localFileResolved || null
             });
-            return { ok: true, result, asset: saved };
+            return { ok: true, uuid: saved.uuid, tag: saved.tag, result, asset: saved };
         }
 
         case 'lite_generate_image': {
@@ -417,6 +479,63 @@ export async function invokeLiteTool(name, args = {}) {
                 duration: args.duration || '8s',
                 engine: args.engine || 'flow',
                 src: result.src || null
+            };
+        }
+
+        case 'lite_generate_video_batch': {
+            const rawScenes = Array.isArray(args.scenes) ? args.scenes : [];
+            if (rawScenes.length === 0) {
+                throw new Error('Se requiere al menos 1 escena en "scenes" para lite_generate_video_batch.');
+            }
+            const resolvedScenes = rawScenes.map((sc, idx) => {
+                const resolvedStart = sc.startFrame ? resolveAssetReference(sc.startFrame) : null;
+                const resolvedEnd = sc.endFrame ? resolveAssetReference(sc.endFrame) : null;
+                const resolvedIngredients = Array.isArray(sc.ingredients)
+                    ? sc.ingredients.map(resolveAssetReference).filter(Boolean)
+                    : [];
+                return {
+                    ...sc,
+                    index: idx,
+                    startFrameUuid: resolvedStart || sc.startFrameUuid || null,
+                    endFrameUuid: resolvedEnd || sc.endFrameUuid || null,
+                    ingredients: resolvedIngredients
+                };
+            });
+
+            const payload = {
+                ...args,
+                scenes: resolvedScenes
+            };
+
+            const res = await callBridge('/generate-video-batch', 'POST', payload, 2400000);
+            const result = res.result || {};
+            const videosOut = Array.isArray(result.videos) ? result.videos : [];
+
+            for (const vid of videosOut) {
+                const idx = Number(vid.index ?? 0);
+                const scInput = resolvedScenes[idx] || {};
+                recordAssetInRegistry({
+                    uuid: vid.uuid || null,
+                    tag: scInput.tag || `@scene_video_${idx + 1}`,
+                    name: scInput.tag ? String(scInput.tag).replace(/^@/, '') : `scene_video_${idx + 1}`,
+                    type: 'video',
+                    engine: args.engine || 'flow',
+                    videoMode: args.videoMode || 'ingredients',
+                    aspectRatio: scInput.aspectRatio || args.aspectRatio || '9:16',
+                    duration: scInput.duration || args.duration || '8s',
+                    prompt: scInput.prompt || '',
+                    src: vid.src || null,
+                    savedFilePath: vid.savedFilePath || null
+                });
+            }
+
+            return {
+                ok: true,
+                totalScenes: result.totalScenes || resolvedScenes.length,
+                videosReady: result.videosReady || videosOut.length,
+                videoChainUsed: Boolean(result.videoChainUsed),
+                finalRenderExecuted: false,
+                videos: videosOut
             };
         }
 

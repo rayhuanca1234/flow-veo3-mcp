@@ -928,6 +928,38 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        if (req.method === 'POST' && (urlObj.pathname === '/generate-videos-batch' || urlObj.pathname === '/generate-video-batch')) {
+            const body = await readJsonBody(req);
+            const result = await sendCommandToExtension('generate_videos_batch', body, 1800000);
+            const videos = Array.isArray(result?.videos) ? result.videos : [];
+            const outputDir = body.outputDir ? path.resolve(WORKSPACE_ROOT, body.outputDir) : path.resolve(WORKSPACE_ROOT, 'workspace-assets', 'standalone');
+            fs.mkdirSync(outputDir, { recursive: true });
+
+            for (let i = 0; i < videos.length; i++) {
+                const v = videos[i];
+                const scInput = body.scenes?.[i] || {};
+                const targetOut = scInput.outputPath || path.join(outputDir, `escena_${String(i + 1).padStart(2, '0')}.mp4`);
+                const savedInfo = await saveStandaloneMediaToDisk({
+                    base64Data: v?.base64Data,
+                    src: v?.src,
+                    downloadedFilename: v?.downloadedFilename,
+                    outputPath: targetOut,
+                    defaultExt: 'mp4',
+                    prefix: `escena_${i + 1}`
+                });
+                if (v && typeof v === 'object') {
+                    delete v.base64Data;
+                    if (savedInfo) {
+                        v.savedFilePath = savedInfo.savedFilePath;
+                        v.sizeBytes = savedInfo.sizeBytes;
+                    }
+                }
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: Boolean(result?.ok !== false), result }));
+            return;
+        }
+
         if (req.method === 'POST' && urlObj.pathname === '/add-ingredient') {
             const body = await readJsonBody(req);
             const result = await sendCommandToExtension('add_ingredient', body);
