@@ -163,13 +163,14 @@ function handleIncomingWsMessage(client, rawText) {
 }
 
 function pickActiveClient() {
-    for (const c of clients) {
+    const list = Array.from(clients).reverse();
+    for (const c of list) {
         if (c.role === 'orchestrator' && !c.socket.destroyed) return c;
     }
-    for (const c of clients) {
+    for (const c of list) {
         if (c.role === 'background' && !c.socket.destroyed) return c;
     }
-    for (const c of clients) {
+    for (const c of list) {
         if (!c.socket.destroyed) return c;
     }
     return null;
@@ -773,7 +774,52 @@ const server = http.createServer(async (req, res) => {
 
         if (req.method === 'POST' && urlObj.pathname === '/generate-image') {
             const body = await readJsonBody(req);
-            const result = await sendCommandToExtension('generate_image', body);
+            let result;
+            try {
+                result = await sendCommandToExtension('generate_image', body);
+            } catch (err) {
+                if (String(err?.message || '').includes('Comando MCP desconocido')) {
+                    const ratio = body.aspectRatio || '16:9';
+                    const finalPrompt = body.style ? `${body.prompt}, ${body.style}` : body.prompt;
+                    const miniSb = {
+                        titulo_proyecto: 'Imagen Standalone Flow',
+                        formato: ratio,
+                        personajes: Array.isArray(body.ingredients)
+                            ? body.ingredients.filter(i => typeof i === 'object' && i).map(i => ({
+                                tag: i.tag || `@${i.name || 'ing'}`,
+                                nombre: i.name || i.tag || 'Ingrediente',
+                                prompt: i.description || i.prompt || '',
+                                src: i.image || null
+                            }))
+                            : [],
+                        hero_assets: [],
+                        escenas: [{
+                            numero: 1,
+                            prompt: finalPrompt,
+                            aspectRatio: ratio
+                        }]
+                    };
+                    await sendCommandToExtension('inject_storyboard', {
+                        storyboard: miniSb,
+                        settings: {
+                            aspectRatio: ratio,
+                            imageGeneratorSource: body.engine || 'flow',
+                            sceneCount: 1
+                        }
+                    });
+                    result = await sendCommandToExtension('regenerate_scene_image', {
+                        sceneIndex: 0,
+                        customPrompt: finalPrompt
+                    });
+                    try {
+                        const exported = await sendCommandToExtension('export_assets', {});
+                        const img0 = (exported?.images || []).find(im => Number(im.index) === 0);
+                        if (img0?.src) result.src = result.src || img0.src;
+                    } catch (_) {}
+                } else {
+                    throw err;
+                }
+            }
             const savedInfo = await saveStandaloneMediaToDisk({
                 base64Data: result?.base64Data,
                 src: result?.src,
@@ -795,7 +841,61 @@ const server = http.createServer(async (req, res) => {
 
         if (req.method === 'POST' && urlObj.pathname === '/generate-video') {
             const body = await readJsonBody(req);
-            const result = await sendCommandToExtension('generate_video', body);
+            let result;
+            try {
+                result = await sendCommandToExtension('generate_video', body);
+            } catch (err) {
+                if (String(err?.message || '').includes('Comando MCP desconocido')) {
+                    const ratio = body.aspectRatio || '9:16';
+                    const dur = body.duration || '8s';
+                    const miniSb = {
+                        titulo_proyecto: 'Video Standalone Flow',
+                        formato: ratio,
+                        personajes: Array.isArray(body.ingredients)
+                            ? body.ingredients.filter(i => typeof i === 'object' && i).map(i => ({
+                                tag: i.tag || `@${i.name || 'ing'}`,
+                                nombre: i.name || i.tag || 'Ingrediente',
+                                prompt: i.description || i.prompt || '',
+                                src: i.image || null
+                            }))
+                            : [],
+                        hero_assets: [],
+                        escenas: [{
+                            numero: 1,
+                            prompt: body.prompt,
+                            animPrompt: `escena-1: ${body.prompt}`,
+                            aspectRatio: ratio,
+                            duration: dur,
+                            duracion_seg: parseInt(dur, 10) || 8
+                        }]
+                    };
+                    await sendCommandToExtension('inject_storyboard', {
+                        storyboard: miniSb,
+                        settings: {
+                            aspectRatio: ratio,
+                            videoGeneratorSource: body.engine || 'flow',
+                            directVideoChars: body.videoMode !== 'frames',
+                            sceneCount: 1,
+                            duration: parseInt(dur, 10) || 8
+                        }
+                    });
+                    result = await sendCommandToExtension('regenerate_scene_video', {
+                        sceneIndex: 0,
+                        customAnimPrompt: `escena-1: ${body.prompt}`
+                    });
+                    try {
+                        const exported = await sendCommandToExtension('export_assets', {});
+                        const vid0 = (exported?.videos || []).find(v => Number(v.index) === 0);
+                        if (vid0) {
+                            result.base64Data = vid0.base64Data || result.base64Data;
+                            result.downloadedFilename = vid0.downloadedFilename || result.downloadedFilename;
+                            result.src = result.src || vid0.src;
+                        }
+                    } catch (_) {}
+                } else {
+                    throw err;
+                }
+            }
             const savedInfo = await saveStandaloneMediaToDisk({
                 base64Data: result?.base64Data,
                 src: result?.src,
